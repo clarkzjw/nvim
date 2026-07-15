@@ -43,7 +43,7 @@ filetype plugin indent on
 syntax enable
 
 set number
-set relativenumber
+" set relativenumber
 set mouse=a
 set termguicolors
 set hidden
@@ -180,20 +180,25 @@ lua <<EOF
   end
 
   local function open_neo_tree()
+    local file_window = vim.api.nvim_get_current_win()
+
     if not neo_tree_session_state then
       vim.cmd('Neotree reveal')
-      return
+    else
+      local manager = require('neo-tree.sources.manager')
+      local state = manager.get_state('filesystem')
+      state.force_open_folders = neo_tree_session_state.expanded
+      require('neo-tree.command').execute({
+        action = 'show',
+        source = 'filesystem',
+        dir = neo_tree_session_state.path,
+      })
+      neo_tree_session_state = nil
     end
 
-    local manager = require('neo-tree.sources.manager')
-    local state = manager.get_state('filesystem')
-    state.force_open_folders = neo_tree_session_state.expanded
-    require('neo-tree.command').execute({
-      action = 'show',
-      source = 'filesystem',
-      dir = neo_tree_session_state.path,
-    })
-    neo_tree_session_state = nil
+    if vim.api.nvim_win_is_valid(file_window) then
+      vim.api.nvim_set_current_win(file_window)
+    end
   end
 
   local function preserve_file_window()
