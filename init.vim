@@ -31,6 +31,7 @@ Plug 'abeldekat/cmp-mini-snippets'
 
 " Git
 Plug 'petertriho/cmp-git'
+Plug 'kdheepak/lazygit.nvim'
 
 call plug#end()
 
@@ -78,6 +79,7 @@ lua <<EOF
       path_display = { 'smart' },
     },
   })
+  require('telescope').load_extension('lazygit')
 
   local telescope_builtin = require('telescope.builtin')
   vim.keymap.set('n', '<leader>ff', telescope_builtin.find_files, { desc = 'Find files' })
@@ -96,6 +98,11 @@ lua <<EOF
   vim.keymap.set('n', '<leader>wr', '<cmd>AutoSession search<CR>', { desc = 'Search sessions' })
   vim.keymap.set('n', '<leader>ws', '<cmd>AutoSession save<CR>', { desc = 'Save session' })
   vim.keymap.set('n', '<leader>wd', '<cmd>AutoSession delete<CR>', { desc = 'Delete session' })
+
+  vim.g.lazygit_floating_window_scaling_factor = 0.9
+  vim.g.lazygit_floating_window_use_plenary = 1
+  vim.keymap.set('n', '<leader>gg', '<cmd>LazyGitCurrentFile<CR>', { desc = 'Open LazyGit' })
+  vim.keymap.set('n', '<leader>gl', '<cmd>Telescope lazygit<CR>', { desc = 'Find Git repositories' })
 
   local treesitter_filetypes = {
     'bash',
