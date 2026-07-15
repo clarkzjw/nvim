@@ -271,30 +271,63 @@ lua <<EOF
   })
 
   local toggleterm_terminal = require('toggleterm.terminal')
+  local toggleterm_ui = require('toggleterm.ui')
+  local tab_terminals = {}
 
-  local function map_terminal(lhs, id, direction, name, description)
+  local function toggle_terminal(terminal, direction, tabpage)
+    if direction ~= 'horizontal' and direction ~= 'vertical' then
+      terminal:toggle(nil, direction)
+      return
+    end
+
+    local find_open_windows = toggleterm_ui.find_open_windows
+    toggleterm_ui.find_open_windows = function(comparator)
+      local _, windows = find_open_windows(comparator)
+      local tab_windows = vim.tbl_filter(function(item)
+        return vim.api.nvim_win_get_tabpage(item.window) == tabpage
+      end, windows)
+      return #tab_windows > 0, tab_windows
+    end
+
+    local ok, error_message = pcall(terminal.toggle, terminal, nil, direction)
+    toggleterm_ui.find_open_windows = find_open_windows
+    if not ok then
+      error(error_message)
+    end
+  end
+
+  local function map_terminal(lhs, role, direction, name, description)
     vim.keymap.set({ 'n', 't' }, lhs, function()
-      local requested = toggleterm_terminal.get(id)
-      if requested and requested:is_open() then
-        requested:close()
+      local _, focused = toggleterm_terminal.identify()
+      if focused and focused:is_focused() and focused.mapped_role == role then
+        focused:close()
         return
       end
 
-      for _, terminal in ipairs(toggleterm_terminal.get_all()) do
-        if terminal:is_open() then
-          terminal:close()
-        end
+      local tabpage = vim.api.nvim_get_current_tabpage()
+      tab_terminals[tabpage] = tab_terminals[tabpage] or {}
+      local requested = tab_terminals[tabpage][role]
+      if requested and requested.bufnr and not vim.api.nvim_buf_is_valid(requested.bufnr) then
+        requested = nil
       end
 
-      requested = toggleterm_terminal.get_or_create_term(id, nil, direction, name)
-      requested:toggle(nil, direction)
+      if not requested then
+        requested = toggleterm_terminal.Terminal:new({
+          direction = direction,
+          display_name = name,
+        })
+        requested.mapped_role = role
+        tab_terminals[tabpage][role] = requested
+      end
+
+      toggle_terminal(requested, direction, tabpage)
     end, { desc = description })
   end
 
-  map_terminal('<leader>tt', 1, 'tab', 'tab', 'Terminal in tab')
-  map_terminal('<leader>tb', 2, 'horizontal', 'below', 'Terminal below')
-  map_terminal('<leader>tv', 3, 'vertical', 'vertical', 'Terminal on right')
-  map_terminal('<leader>tf', 4, 'float', 'float', 'Floating terminal')
+  map_terminal('<leader>tt', 'tab', 'tab', 'tab', 'Terminal in tab')
+  map_terminal('<leader>tb', 'below', 'horizontal', 'below', 'Terminal below')
+  map_terminal('<leader>tv', 'vertical', 'vertical', 'vertical', 'Terminal on right')
+  map_terminal('<leader>tf', 'float', 'float', 'float', 'Floating terminal')
 
   vim.api.nvim_create_autocmd('TermOpen', {
     pattern = 'term://*toggleterm#*',
