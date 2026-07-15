@@ -20,6 +20,10 @@ Plug 'MunifTanjim/nui.nvim'
 Plug 'nvim-tree/nvim-web-devicons'
 Plug 'nvim-neo-tree/neo-tree.nvim', { 'branch': 'v3.x' }
 
+" Search and sessions
+Plug 'nvim-telescope/telescope.nvim'
+Plug 'rmagatti/auto-session'
+
 " For mini.snippets users.
 Plug 'nvim-mini/mini.snippets'
 Plug 'rafamadriz/friendly-snippets'
@@ -47,6 +51,15 @@ lua <<EOF
       statementStyle = { bold = true },
       terminalColors = true,
       theme = 'wave',
+      overrides = function(colors)
+        return {
+          CmpDocumentation = { bg = colors.palette.sumiInk0 },
+          CmpDocumentationBorder = {
+            fg = colors.palette.crystalBlue,
+            bg = colors.palette.sumiInk0,
+          },
+        }
+      end,
     })
     vim.cmd.colorscheme('kanagawa-wave')
   end
@@ -59,6 +72,30 @@ lua <<EOF
       },
     },
   })
+
+  require('telescope').setup({
+    defaults = {
+      path_display = { 'smart' },
+    },
+  })
+
+  local telescope_builtin = require('telescope.builtin')
+  vim.keymap.set('n', '<leader>ff', telescope_builtin.find_files, { desc = 'Find files' })
+  vim.keymap.set('n', '<leader>fg', telescope_builtin.live_grep, { desc = 'Live grep' })
+  vim.keymap.set('n', '<leader>fb', telescope_builtin.buffers, { desc = 'Find buffers' })
+  vim.keymap.set('n', '<leader>fh', telescope_builtin.help_tags, { desc = 'Find help' })
+
+  vim.o.sessionoptions = 'blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions'
+  require('auto-session').setup({
+    suppressed_dirs = { '~/', '/' },
+    session_lens = {
+      picker = 'telescope',
+    },
+  })
+
+  vim.keymap.set('n', '<leader>wr', '<cmd>AutoSession search<CR>', { desc = 'Search sessions' })
+  vim.keymap.set('n', '<leader>ws', '<cmd>AutoSession save<CR>', { desc = 'Save session' })
+  vim.keymap.set('n', '<leader>wd', '<cmd>AutoSession delete<CR>', { desc = 'Delete session' })
 
   local treesitter_filetypes = {
     'bash',
