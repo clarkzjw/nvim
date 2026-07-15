@@ -26,6 +26,7 @@ Plug 'nvim-neo-tree/neo-tree.nvim', { 'branch': 'v3.x' }
 Plug 'nvim-telescope/telescope.nvim'
 Plug 'rmagatti/auto-session'
 Plug 'akinsho/toggleterm.nvim', { 'tag': '*' }
+Plug 'nanozuki/tabby.nvim'
 
 " For mini.snippets users.
 Plug 'nvim-mini/mini.snippets'
@@ -46,15 +47,19 @@ set relativenumber
 set mouse=a
 set termguicolors
 set hidden
+set timeoutlen=2000
 
 let g:vimtex_compiler_method = 'latexmk'
 let g:vimtex_view_method = 'skim'
 let g:vimtex_view_skim_sync = 1
 let g:vimtex_view_skim_activate = 0
 let g:vimtex_quickfix_mode = 0
+let g:vimtex_main_choose_first = 1
 
 lua <<EOF
   vim.keymap.set({ 'n', 'i', 'x' }, '<C-s>', '<cmd>write<CR>', { desc = 'Save file' })
+  vim.keymap.set({ 'n', 'i', 'x' }, '<D-s>', '<cmd>write<CR>', { desc = 'Save file' })
+  vim.keymap.set({ 'n', 'i', 'x' }, '<D-z>', '<cmd>undo<CR>', { desc = 'Undo' })
 
   local kanagawa_ok, kanagawa = pcall(require, 'kanagawa')
   if kanagawa_ok then
@@ -80,6 +85,9 @@ lua <<EOF
 
   require('neo-tree').setup({
     filesystem = {
+      filtered_items = {
+        visible = true,
+      },
       follow_current_file = {
         enabled = true,
         leave_dirs_open = false,
@@ -87,9 +95,59 @@ lua <<EOF
     },
   })
 
+  local function open_telescope_selections_in_tabs(prompt_bufnr)
+    local action_state = require('telescope.actions.state')
+    local actions = require('telescope.actions')
+    local picker = action_state.get_current_picker(prompt_bufnr)
+    local selections = picker:get_multi_selection()
+
+    if #selections == 0 then
+      local selected = action_state.get_selected_entry()
+      if not selected then
+        return
+      end
+      selections = { selected }
+    end
+
+    local cwd = picker.cwd or vim.uv.cwd()
+    actions.close(prompt_bufnr)
+    for _, entry in ipairs(selections) do
+      if entry.bufnr then
+        vim.cmd('tab sbuffer ' .. entry.bufnr)
+      else
+        local filename = entry.path or entry.filename or entry.value
+        if type(filename) == 'string' then
+          filename = vim.fs.abspath(filename, { base = cwd })
+          vim.cmd('tabedit ' .. vim.fn.fnameescape(filename))
+        end
+      end
+
+      require('neo-tree.command').execute({
+        action = 'show',
+        source = 'filesystem',
+        reveal = true,
+      })
+      -- Neo-tree debounces filesystem scans across tabs.
+      vim.wait(120)
+    end
+  end
+
   require('telescope').setup({
     defaults = {
       path_display = { 'smart' },
+    },
+    pickers = {
+      find_files = {
+        hidden = true,
+        mappings = {
+          i = {
+            ['<C-t>'] = open_telescope_selections_in_tabs,
+          },
+          n = {
+            ['<C-t>'] = open_telescope_selections_in_tabs,
+          },
+        },
+      },
     },
   })
   require('telescope').load_extension('lazygit')
@@ -159,7 +217,9 @@ lua <<EOF
     end
   end
 
-  vim.o.sessionoptions = 'blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions'
+  -- Plugin-local mappings are recreated by filetype plugins. Serializing them can
+  -- produce executable fragments such as VimTeX's operator-pending `g@` mapping.
+  vim.o.sessionoptions = 'blank,buffers,curdir,folds,help,tabpages,winsize,winpos'
   require('auto-session').setup({
     suppressed_dirs = { '~/', '/' },
     save_extra_data = save_neo_tree_state,
@@ -175,6 +235,18 @@ lua <<EOF
   vim.keymap.set('n', '<leader>wr', '<cmd>AutoSession search<CR>', { desc = 'Search sessions' })
   vim.keymap.set('n', '<leader>ws', '<cmd>AutoSession save<CR>', { desc = 'Save session' })
   vim.keymap.set('n', '<leader>wd', '<cmd>AutoSession delete<CR>', { desc = 'Delete session' })
+
+  vim.o.showtabline = 2
+  require('tabby').setup({
+    preset = 'tab_only',
+    option = {
+      nerdfont = true,
+      buf_name = {
+        mode = 'tail',
+      },
+    },
+  })
+  vim.keymap.set('n', '<leader>tT', '<cmd>Tabby jump_to_tab<CR>', { desc = 'Jump to tab' })
 
   require('toggleterm').setup({
     size = function(terminal)
@@ -193,15 +265,31 @@ lua <<EOF
     },
   })
 
-  local function map_terminal(lhs, command, description)
-    vim.keymap.set('n', lhs, '<cmd>' .. command .. '<CR>', { desc = description })
-    vim.keymap.set('t', lhs, '<C-\\><C-n><cmd>' .. command .. '<CR>', { desc = description })
+  local toggleterm_terminal = require('toggleterm.terminal')
+
+  local function map_terminal(lhs, id, direction, name, description)
+    vim.keymap.set({ 'n', 't' }, lhs, function()
+      local requested = toggleterm_terminal.get(id)
+      if requested and requested:is_open() then
+        requested:close()
+        return
+      end
+
+      for _, terminal in ipairs(toggleterm_terminal.get_all()) do
+        if terminal:is_open() then
+          terminal:close()
+        end
+      end
+
+      requested = toggleterm_terminal.get_or_create_term(id, nil, direction, name)
+      requested:toggle(nil, direction)
+    end, { desc = description })
   end
 
-  map_terminal('<leader>tt', '1ToggleTerm direction=tab name=tab', 'Terminal in tab')
-  map_terminal('<leader>tb', '2ToggleTerm direction=horizontal name=below', 'Terminal below')
-  map_terminal('<leader>tv', '3ToggleTerm direction=vertical name=vertical', 'Terminal on right')
-  map_terminal('<leader>tf', '4ToggleTerm direction=float name=float', 'Floating terminal')
+  map_terminal('<leader>tt', 1, 'tab', 'tab', 'Terminal in tab')
+  map_terminal('<leader>tb', 2, 'horizontal', 'below', 'Terminal below')
+  map_terminal('<leader>tv', 3, 'vertical', 'vertical', 'Terminal on right')
+  map_terminal('<leader>tf', 4, 'float', 'float', 'Floating terminal')
 
   vim.api.nvim_create_autocmd('TermOpen', {
     pattern = 'term://*toggleterm#*',
