@@ -5,6 +5,7 @@ Plug 'hrsh7th/cmp-buffer'
 Plug 'hrsh7th/cmp-path'
 Plug 'hrsh7th/cmp-cmdline'
 Plug 'hrsh7th/nvim-cmp'
+Plug 'windwp/nvim-autopairs'
 
 " Go
 Plug 'ray-x/guihua.lua'
@@ -39,8 +40,6 @@ set number
 set relativenumber
 set mouse=a
 set termguicolors
-
-autocmd VimEnter * Neotree reveal
 
 lua <<EOF
   local kanagawa_ok, kanagawa = pcall(require, 'kanagawa')
@@ -87,9 +86,73 @@ lua <<EOF
   vim.keymap.set('n', '<leader>fb', telescope_builtin.buffers, { desc = 'Find buffers' })
   vim.keymap.set('n', '<leader>fh', telescope_builtin.help_tags, { desc = 'Find help' })
 
+  local neo_tree_session_state
+
+  local function save_neo_tree_state()
+    local state = require('neo-tree.sources.manager').get_state('filesystem')
+    if not state.tree then
+      return
+    end
+
+    return vim.json.encode({
+      path = state.path,
+      expanded = require('neo-tree.ui.renderer').get_expanded_nodes(state.tree),
+    })
+  end
+
+  local function restore_neo_tree_state(_, extra_data)
+    local ok, state = pcall(vim.json.decode, extra_data)
+    if ok then
+      neo_tree_session_state = state
+    end
+  end
+
+  local function open_neo_tree()
+    if not neo_tree_session_state then
+      vim.cmd('Neotree reveal')
+      return
+    end
+
+    local manager = require('neo-tree.sources.manager')
+    local state = manager.get_state('filesystem')
+    state.force_open_folders = neo_tree_session_state.expanded
+    require('neo-tree.command').execute({
+      action = 'show',
+      source = 'filesystem',
+      dir = neo_tree_session_state.path,
+    })
+    neo_tree_session_state = nil
+  end
+
+  local function preserve_file_window()
+    local windows = vim.api.nvim_list_wins()
+    if #windows ~= 1 or vim.bo[vim.api.nvim_win_get_buf(windows[1])].filetype ~= 'neo-tree' then
+      return
+    end
+
+    local buffers = vim.fn.getbufinfo({ buflisted = 1 })
+    table.sort(buffers, function(a, b)
+      return a.lastused > b.lastused
+    end)
+    for _, buffer in ipairs(buffers) do
+      if buffer.name ~= '' and vim.fn.filereadable(buffer.name) == 1 then
+        local neo_tree_window = windows[1]
+        vim.cmd('new')
+        vim.api.nvim_win_set_buf(0, buffer.bufnr)
+        vim.api.nvim_win_close(neo_tree_window, true)
+        return
+      end
+    end
+  end
+
   vim.o.sessionoptions = 'blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions'
   require('auto-session').setup({
     suppressed_dirs = { '~/', '/' },
+    save_extra_data = save_neo_tree_state,
+    restore_extra_data = restore_neo_tree_state,
+    pre_save_cmds = { preserve_file_window },
+    post_restore_cmds = { open_neo_tree },
+    no_restore_cmds = { open_neo_tree },
     session_lens = {
       picker = 'telescope',
     },
@@ -151,6 +214,7 @@ lua <<EOF
       snippets.gen_loader.from_lang(),
     },
   })
+  require('nvim-autopairs').setup({})
 
   cmp.setup({
     snippet = {
@@ -171,7 +235,21 @@ lua <<EOF
       ['<C-f>'] = cmp.mapping.scroll_docs(4),
       ['<C-Space>'] = cmp.mapping.complete(),
       ['<C-e>'] = cmp.mapping.abort(),
-      ['<CR>'] = cmp.mapping.confirm({ select = true }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
+      ['<Tab>'] = cmp.mapping(function(fallback)
+        if cmp.visible() then
+          cmp.select_next_item()
+        else
+          fallback()
+        end
+      end, { 'i', 's' }),
+      ['<S-Tab>'] = cmp.mapping(function(fallback)
+        if cmp.visible() then
+          cmp.select_prev_item()
+        else
+          fallback()
+        end
+      end, { 'i', 's' }),
+      ['<CR>'] = cmp.mapping.confirm({ select = false }),
     }),
     sources = cmp.config.sources({
       { name = 'nvim_lsp' },
@@ -180,6 +258,7 @@ lua <<EOF
       { name = 'buffer' },
     })
   })
+  cmp.event:on('confirm_done', require('nvim-autopairs.completion.cmp').on_confirm_done())
 
   -- To use git you need to install the plugin petertriho/cmp-git and uncomment lines below
   -- Set configuration for specific filetype.
