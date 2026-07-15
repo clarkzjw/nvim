@@ -6,6 +6,13 @@ Plug 'hrsh7th/cmp-path'
 Plug 'hrsh7th/cmp-cmdline'
 Plug 'hrsh7th/nvim-cmp'
 
+" Go
+Plug 'ray-x/guihua.lua'
+Plug 'ray-x/go.nvim'
+
+" Syntax highlighting
+Plug 'nvim-treesitter/nvim-treesitter', { 'branch': 'main', 'do': ':TSUpdate' }
+
 " neo-tree
 Plug 'nvim-lua/plenary.nvim'
 Plug 'MunifTanjim/nui.nvim'
@@ -24,10 +31,49 @@ call plug#end()
 
 set number
 set relativenumber
+set mouse=a
 
 autocmd VimEnter * Neotree show
 
 lua <<EOF
+  local treesitter_filetypes = {
+    'bash',
+    'go',
+    'gomod',
+    'gosum',
+    'gotmpl',
+    'gowork',
+    'json',
+    'lua',
+    'markdown',
+    'markdown_inline',
+    'python',
+    'toml',
+    'vim',
+    'vimdoc',
+    'yaml',
+  }
+
+  vim.api.nvim_create_autocmd('FileType', {
+    pattern = treesitter_filetypes,
+    callback = function()
+      vim.treesitter.start()
+    end,
+  })
+
+  vim.keymap.set('n', '<C-LeftMouse>', function()
+    local mouse = vim.fn.getmousepos()
+    if mouse.winid == 0 or mouse.line == 0 or not vim.api.nvim_win_is_valid(mouse.winid) then
+      return
+    end
+
+    vim.api.nvim_set_current_win(mouse.winid)
+    vim.api.nvim_win_set_cursor(mouse.winid, { mouse.line, math.max(mouse.column - 1, 0) })
+    vim.lsp.buf.definition()
+  end, { desc = 'Go to definition under mouse' })
+
+  vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { desc = 'Go to definition' })
+
   -- Set up nvim-cmp.
   local cmp = require'cmp'
   local snippets = require'mini.snippets'
@@ -97,11 +143,39 @@ lua <<EOF
     matching = { disallow_symbol_nonprefix_matching = false }
   })
 
-  -- Set up lspconfig.
+  -- Set up Go tooling and gopls with completion support.
   local capabilities = require('cmp_nvim_lsp').default_capabilities()
-  -- Replace <YOUR_LSP_SERVER> with each lsp server you've enabled.
-  vim.lsp.config('<YOUR_LSP_SERVER>', {
-    capabilities = capabilities
+  require('go').setup({
+    lsp_cfg = false,
+    lsp_gofumpt = true,
+    goimports = 'gopls',
+    gofmt = 'gopls',
+    dap_debug = false,
   })
-  vim.lsp.enable('<YOUR_LSP_SERVER>')
+
+  local gopls_config = require('go.lsp').config()
+  gopls_config.capabilities = vim.tbl_deep_extend(
+    'force',
+    gopls_config.capabilities or {},
+    capabilities
+  )
+  -- gopls v0.16 does not support customizing its semantic-token legend.
+  gopls_config.settings.gopls.semanticTokenTypes = nil
+  gopls_config.settings.gopls.semanticTokenModifiers = nil
+  vim.lsp.config('gopls', gopls_config)
+  vim.lsp.enable('gopls')
+
+  vim.lsp.config('pyright', {
+    capabilities = capabilities,
+  })
+  vim.lsp.enable('pyright')
+
+  local go_format_group = vim.api.nvim_create_augroup('GoFormat', { clear = true })
+  vim.api.nvim_create_autocmd('BufWritePre', {
+    group = go_format_group,
+    pattern = '*.go',
+    callback = function()
+      require('go.format').goimports()
+    end,
+  })
 EOF
