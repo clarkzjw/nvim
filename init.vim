@@ -14,6 +14,7 @@ Plug 'ray-x/go.nvim'
 " Syntax highlighting
 Plug 'nvim-treesitter/nvim-treesitter', { 'branch': 'main', 'do': ':TSUpdate' }
 Plug 'rebelot/kanagawa.nvim'
+Plug 'lervag/vimtex'
 
 " neo-tree
 Plug 'nvim-lua/plenary.nvim'
@@ -37,13 +38,24 @@ Plug 'kdheepak/lazygit.nvim'
 
 call plug#end()
 
+filetype plugin indent on
+syntax enable
+
 set number
 set relativenumber
 set mouse=a
 set termguicolors
 set hidden
 
+let g:vimtex_compiler_method = 'latexmk'
+let g:vimtex_view_method = 'skim'
+let g:vimtex_view_skim_sync = 1
+let g:vimtex_view_skim_activate = 0
+let g:vimtex_quickfix_mode = 0
+
 lua <<EOF
+  vim.keymap.set({ 'n', 'i', 'x' }, '<C-s>', '<cmd>write<CR>', { desc = 'Save file' })
+
   local kanagawa_ok, kanagawa = pcall(require, 'kanagawa')
   if kanagawa_ok then
     kanagawa.setup({
@@ -355,6 +367,22 @@ lua <<EOF
     capabilities = capabilities,
   })
   vim.lsp.enable('pyright')
+
+  vim.lsp.config('texlab', {
+    capabilities = capabilities,
+    settings = {
+      texlab = {
+        build = {
+          onSave = false,
+        },
+        chktex = {
+          onOpenAndSave = true,
+          onEdit = false,
+        },
+      },
+    },
+  })
+  vim.lsp.enable('texlab')
 
   local go_format_group = vim.api.nvim_create_augroup('GoFormat', { clear = true })
   vim.api.nvim_create_autocmd('BufWritePre', {
