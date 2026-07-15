@@ -306,6 +306,18 @@ lua <<EOF
     end,
   })
 
+  vim.api.nvim_create_autocmd('BufEnter', {
+    pattern = 'term://*toggleterm#*',
+    callback = function(event)
+      vim.schedule(function()
+        if vim.api.nvim_buf_is_valid(event.buf) and vim.api.nvim_get_current_buf() == event.buf then
+          vim.cmd.startinsert()
+        end
+      end)
+    end,
+    desc = 'Enter terminal mode when focusing ToggleTerm',
+  })
+
   vim.g.lazygit_floating_window_scaling_factor = 0.9
   vim.g.lazygit_floating_window_use_plenary = 1
   vim.keymap.set('n', '<leader>gg', '<cmd>LazyGitCurrentFile<CR>', { desc = 'Open LazyGit' })
