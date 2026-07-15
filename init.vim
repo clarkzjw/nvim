@@ -12,6 +12,7 @@ Plug 'ray-x/go.nvim'
 
 " Syntax highlighting
 Plug 'nvim-treesitter/nvim-treesitter', { 'branch': 'main', 'do': ':TSUpdate' }
+Plug 'rebelot/kanagawa.nvim'
 
 " neo-tree
 Plug 'nvim-lua/plenary.nvim'
@@ -32,10 +33,33 @@ call plug#end()
 set number
 set relativenumber
 set mouse=a
+set termguicolors
 
-autocmd VimEnter * Neotree show
+autocmd VimEnter * Neotree reveal
 
 lua <<EOF
+  local kanagawa_ok, kanagawa = pcall(require, 'kanagawa')
+  if kanagawa_ok then
+    kanagawa.setup({
+      commentStyle = { italic = true },
+      functionStyle = { bold = true },
+      keywordStyle = { italic = true },
+      statementStyle = { bold = true },
+      terminalColors = true,
+      theme = 'wave',
+    })
+    vim.cmd.colorscheme('kanagawa-wave')
+  end
+
+  require('neo-tree').setup({
+    filesystem = {
+      follow_current_file = {
+        enabled = true,
+        leave_dirs_open = false,
+      },
+    },
+  })
+
   local treesitter_filetypes = {
     'bash',
     'go',
