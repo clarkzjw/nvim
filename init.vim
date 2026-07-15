@@ -24,6 +24,7 @@ Plug 'nvim-neo-tree/neo-tree.nvim', { 'branch': 'v3.x' }
 " Search and sessions
 Plug 'nvim-telescope/telescope.nvim'
 Plug 'rmagatti/auto-session'
+Plug 'akinsho/toggleterm.nvim', { 'tag': '*' }
 
 " For mini.snippets users.
 Plug 'nvim-mini/mini.snippets'
@@ -40,6 +41,7 @@ set number
 set relativenumber
 set mouse=a
 set termguicolors
+set hidden
 
 lua <<EOF
   local kanagawa_ok, kanagawa = pcall(require, 'kanagawa')
@@ -161,6 +163,43 @@ lua <<EOF
   vim.keymap.set('n', '<leader>wr', '<cmd>AutoSession search<CR>', { desc = 'Search sessions' })
   vim.keymap.set('n', '<leader>ws', '<cmd>AutoSession save<CR>', { desc = 'Save session' })
   vim.keymap.set('n', '<leader>wd', '<cmd>AutoSession delete<CR>', { desc = 'Delete session' })
+
+  require('toggleterm').setup({
+    size = function(terminal)
+      if terminal.direction == 'horizontal' then
+        return 15
+      elseif terminal.direction == 'vertical' then
+        return math.floor(vim.o.columns * 0.4)
+      end
+    end,
+    start_in_insert = true,
+    persist_size = true,
+    persist_mode = true,
+    close_on_exit = true,
+    float_opts = {
+      border = 'curved',
+    },
+  })
+
+  local function map_terminal(lhs, command, description)
+    vim.keymap.set('n', lhs, '<cmd>' .. command .. '<CR>', { desc = description })
+    vim.keymap.set('t', lhs, '<C-\\><C-n><cmd>' .. command .. '<CR>', { desc = description })
+  end
+
+  map_terminal('<leader>tt', '1ToggleTerm direction=tab name=tab', 'Terminal in tab')
+  map_terminal('<leader>tb', '2ToggleTerm direction=horizontal name=below', 'Terminal below')
+  map_terminal('<leader>tv', '3ToggleTerm direction=vertical name=vertical', 'Terminal on right')
+  map_terminal('<leader>tf', '4ToggleTerm direction=float name=float', 'Floating terminal')
+
+  vim.api.nvim_create_autocmd('TermOpen', {
+    pattern = 'term://*toggleterm#*',
+    callback = function(event)
+      vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', {
+        buffer = event.buf,
+        desc = 'Leave terminal mode',
+      })
+    end,
+  })
 
   vim.g.lazygit_floating_window_scaling_factor = 0.9
   vim.g.lazygit_floating_window_use_plenary = 1
