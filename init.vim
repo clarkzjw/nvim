@@ -84,6 +84,14 @@ lua <<EOF
   end
 
   require('neo-tree').setup({
+    event_handlers = {
+      {
+        event = 'neo_tree_buffer_enter',
+        handler = function()
+          vim.wo.wrap = true
+        end,
+      },
+    },
     filesystem = {
       filtered_items = {
         visible = true,
