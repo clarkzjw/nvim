@@ -57,6 +57,15 @@ let g:vimtex_quickfix_mode = 0
 let g:vimtex_main_choose_first = 1
 
 lua <<EOF
+  vim.opt.autoread = true
+
+  local auto_reload_group = vim.api.nvim_create_augroup('AutoReloadFromDisk', { clear = true })
+  vim.api.nvim_create_autocmd({ 'FocusGained', 'BufEnter', 'CursorHold', 'CursorHoldI' }, {
+    group = auto_reload_group,
+    command = 'checktime',
+    desc = 'Reload files changed outside Neovim',
+  })
+
   vim.keymap.set({ 'n', 'i', 'x' }, '<C-s>', '<cmd>write<CR>', { desc = 'Save file' })
   vim.keymap.set({ 'n', 'i', 'x' }, '<D-s>', '<cmd>write<CR>', { desc = 'Save file' })
   vim.keymap.set({ 'n', 'i', 'x' }, '<D-z>', '<cmd>undo<CR>', { desc = 'Undo' })
