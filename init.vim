@@ -395,7 +395,8 @@ lua <<EOF
   vim.api.nvim_create_autocmd('FileType', {
     pattern = treesitter_filetypes,
     callback = function()
-      vim.treesitter.start()
+      -- A missing or stale parser must not abort FileType and block LSP startup.
+      pcall(vim.treesitter.start)
     end,
   })
 

@@ -157,7 +157,7 @@ nvim --headless -u "${INIT_VIM}" \
 
 printf 'Installing Treesitter parsers...\n'
 nvim --headless -u "${INIT_VIM}" \
-  "+lua require('nvim-treesitter').install({ 'bash', 'go', 'gomod', 'gosum', 'gotmpl', 'gowork', 'json', 'lua', 'markdown', 'markdown_inline', 'python', 'toml', 'vim', 'vimdoc', 'yaml' }):wait(300000)" \
+  "+lua require('nvim-treesitter').install({ 'bash', 'go', 'gomod', 'gosum', 'gotmpl', 'gowork', 'json', 'lua', 'markdown', 'markdown_inline', 'python', 'toml', 'vim', 'vimdoc', 'yaml' }, { force = true }):wait(300000)" \
   '+qa'
 
 printf '\nSetup complete. Ensure ~/.local/bin is on PATH, then restart Neovim.\n'
