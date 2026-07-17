@@ -524,6 +524,11 @@ lua <<EOF
   })
   vim.lsp.enable('pyright')
 
+  vim.lsp.config('bashls', {
+    capabilities = capabilities,
+  })
+  vim.lsp.enable('bashls')
+
   vim.lsp.config('texlab', {
     capabilities = capabilities,
     settings = {
