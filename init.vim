@@ -417,6 +417,7 @@ lua <<EOF
   end, { desc = 'Go to definition under mouse' })
 
   vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { desc = 'Go to definition' })
+  vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { desc = 'Rename symbol' })
 
   -- Set up nvim-cmp.
   local cmp = require'cmp'
