@@ -26,7 +26,6 @@ install_macos_dependencies() {
   brew update
   brew install \
     bash-language-server \
-    chktex \
     curl \
     fd \
     git \
@@ -125,7 +124,7 @@ install_linux_dependencies() {
   printf 'Installing language tooling under ~/.local...\n'
   GOBIN="${HOME}/.local/bin" go install golang.org/x/tools/gopls@latest
   GOBIN="${HOME}/.local/bin" go install github.com/jesseduffield/lazygit@latest
-  npm install --global --prefix "${HOME}/.local" bash-language-server pyright
+  npm install --global --prefix "${HOME}/.local" bash-language-server pyright tree-sitter-cli
 }
 
 case "$(uname -s)" in
