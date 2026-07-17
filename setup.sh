@@ -83,6 +83,16 @@ install_linux_dependencies() {
   mkdir -p "${HOME}/.local/bin" "${HOME}/.local/lib/nvim"
   export PATH="${HOME}/.local/bin:${PATH}"
 
+  CARGO_HOME="${HOME}/.local/share/cargo"
+  RUSTUP_HOME="${HOME}/.local/share/rustup"
+  export CARGO_HOME RUSTUP_HOME
+
+  if [[ ! -x "${CARGO_HOME}/bin/cargo" ]]; then
+    printf 'Installing Rust under ~/.local...\n'
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+      sh -s -- -y --no-modify-path --profile minimal
+  fi
+
   if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
     ln -sfn "$(command -v fdfind)" "${HOME}/.local/bin/fd"
   fi
@@ -124,7 +134,16 @@ install_linux_dependencies() {
   printf 'Installing language tooling under ~/.local...\n'
   GOBIN="${HOME}/.local/bin" go install golang.org/x/tools/gopls@latest
   GOBIN="${HOME}/.local/bin" go install github.com/jesseduffield/lazygit@latest
-  npm install --global --prefix "${HOME}/.local" bash-language-server pyright tree-sitter-cli
+  npm uninstall --global --prefix "${HOME}/.local" tree-sitter-cli
+  npm install --global --prefix "${HOME}/.local" bash-language-server pyright
+
+  printf 'Building Tree-sitter CLI against the local glibc...\n'
+  "${CARGO_HOME}/bin/cargo" install \
+    --locked \
+    --force \
+    --root "${HOME}/.local" \
+    --version 0.26.11 \
+    tree-sitter-cli
 }
 
 case "$(uname -s)" in
