@@ -36,6 +36,8 @@ Plug 'abeldekat/cmp-mini-snippets'
 " Git
 Plug 'petertriho/cmp-git'
 Plug 'kdheepak/lazygit.nvim'
+Plug 'lewis6991/gitsigns.nvim'
+Plug 'lewis6991/satellite.nvim'
 
 call plug#end()
 
@@ -91,6 +93,9 @@ lua <<EOF
     })
     vim.cmd.colorscheme('kanagawa-wave')
   end
+
+  require('gitsigns').setup()
+  require('satellite').setup()
 
   require('neo-tree').setup({
     event_handlers = {
