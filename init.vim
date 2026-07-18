@@ -6,6 +6,7 @@ Plug 'hrsh7th/cmp-path'
 Plug 'hrsh7th/cmp-cmdline'
 Plug 'hrsh7th/nvim-cmp'
 Plug 'windwp/nvim-autopairs'
+Plug 'stevearc/conform.nvim'
 
 " Go
 Plug 'ray-x/guihua.lua'
@@ -96,6 +97,17 @@ lua <<EOF
 
   require('gitsigns').setup()
   require('satellite').setup()
+
+  require('conform').setup({
+    formatters_by_ft = {
+      python = { 'ruff_fix', 'ruff_format' },
+    },
+    format_on_save = function(bufnr)
+      if vim.bo[bufnr].filetype == 'python' then
+        return { timeout_ms = 1000, lsp_format = 'never' }
+      end
+    end,
+  })
 
   require('neo-tree').setup({
     event_handlers = {
