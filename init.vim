@@ -110,6 +110,14 @@ lua <<EOF
   })
 
   require('neo-tree').setup({
+    default_component_configs = {
+      last_modified = {
+        enabled = false,
+      },
+      type = {
+        enabled = false,
+      },
+    },
     event_handlers = {
       {
         event = 'neo_tree_buffer_enter',
