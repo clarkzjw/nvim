@@ -155,23 +155,27 @@ lua <<EOF
     local cwd = picker.cwd or vim.uv.cwd()
     actions.close(prompt_bufnr)
     for _, entry in ipairs(selections) do
+      local filename
       if entry.bufnr then
         vim.cmd('tab sbuffer ' .. entry.bufnr)
+        filename = vim.api.nvim_buf_get_name(entry.bufnr)
       else
-        local filename = entry.path or entry.filename or entry.value
+        filename = entry.path or entry.filename or entry.value
         if type(filename) == 'string' then
           filename = vim.fs.abspath(filename, { base = cwd })
           vim.cmd('tabedit ' .. vim.fn.fnameescape(filename))
         end
       end
 
-      require('neo-tree.command').execute({
-        action = 'show',
-        source = 'filesystem',
-        reveal = true,
-      })
-      -- Neo-tree debounces filesystem scans across tabs.
-      vim.wait(120)
+      if type(filename) == 'string' and filename ~= '' then
+        require('neo-tree.command').execute({
+          action = 'show',
+          source = 'filesystem',
+          reveal_file = filename,
+        })
+        -- Neo-tree debounces filesystem scans across tabs.
+        vim.wait(120)
+      end
     end
   end
 
@@ -182,6 +186,7 @@ lua <<EOF
     pickers = {
       find_files = {
         hidden = true,
+        no_ignore = true,
         mappings = {
           i = {
             ['<C-t>'] = open_telescope_selections_in_tabs,
