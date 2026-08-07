@@ -31,6 +31,8 @@ install_macos_dependencies() {
     git \
     go \
     gopls \
+    ghostscript \
+    imagemagick \
     lazygit \
     neovim \
     node \
@@ -76,6 +78,8 @@ install_linux_dependencies() {
     file \
     git \
     golang-go \
+    ghostscript \
+    imagemagick \
     npm \
     ripgrep \
     tar

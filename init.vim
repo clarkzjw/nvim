@@ -21,6 +21,7 @@ Plug 'lervag/vimtex'
 Plug 'nvim-lua/plenary.nvim'
 Plug 'MunifTanjim/nui.nvim'
 Plug 'nvim-tree/nvim-web-devicons'
+Plug 'folke/snacks.nvim'
 Plug 'nvim-neo-tree/neo-tree.nvim', { 'branch': 'v3.x' }
 
 " Search and sessions
@@ -97,6 +98,48 @@ lua <<EOF
 
   require('gitsigns').setup()
   require('satellite').setup()
+
+  require('snacks').setup({
+    image = {
+      enabled = true,
+      formats = { 'png', 'jpg', 'jpeg', 'pdf' },
+      doc = {
+        enabled = false,
+      },
+    },
+  })
+
+  local image_placements = {}
+  local snacks_image_buf = require('snacks.image.buf')
+  local snacks_image_attach = snacks_image_buf._attach
+  snacks_image_buf._attach = function(buf, opts)
+    local placement = snacks_image_attach(buf, opts)
+    image_placements[buf] = placement
+    return placement
+  end
+
+  local image_reopen_group = vim.api.nvim_create_augroup('ImageReopen', { clear = true })
+  vim.api.nvim_create_autocmd('BufEnter', {
+    group = image_reopen_group,
+    pattern = { '*.png', '*.jpg', '*.jpeg', '*.pdf' },
+    callback = function(event)
+      local placement = image_placements[event.buf]
+      if placement and placement.hidden then
+        vim.schedule(function()
+          if vim.api.nvim_buf_is_valid(event.buf) then
+            placement:show()
+          end
+        end)
+      end
+    end,
+    desc = 'Restore an image placement when reopening its buffer',
+  })
+  vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
+    group = image_reopen_group,
+    callback = function(event)
+      image_placements[event.buf] = nil
+    end,
+  })
 
   require('conform').setup({
     formatters_by_ft = {
