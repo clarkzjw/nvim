@@ -7,6 +7,7 @@ Plug 'hrsh7th/cmp-cmdline'
 Plug 'hrsh7th/nvim-cmp'
 Plug 'windwp/nvim-autopairs'
 Plug 'stevearc/conform.nvim'
+Plug 'rickhowe/wrapwidth'
 
 " Go
 Plug 'ray-x/guihua.lua'
@@ -55,6 +56,21 @@ set mouse=a
 set termguicolors
 set hidden
 set timeoutlen=2000
+set wrap
+set linebreak
+set breakindent
+set colorcolumn=120
+
+function! s:ApplyFixedSoftWrap() abort
+  if &buftype ==# ''
+    execute 'silent! Wrapwidth ' . str2nr(&colorcolumn)
+  endif
+endfunction
+
+augroup fixed_soft_wrap
+  autocmd!
+  autocmd BufWinEnter * call <SID>ApplyFixedSoftWrap()
+augroup END
 
 let g:vimtex_compiler_method = 'latexmk'
 let g:vimtex_view_method = 'skim'
@@ -391,17 +407,43 @@ lua <<EOF
   -- Plugin-local mappings are recreated by filetype plugins. Serializing them can
   -- produce executable fragments such as VimTeX's operator-pending `g@` mapping.
   vim.o.sessionoptions = 'blank,buffers,curdir,folds,help,tabpages,winsize,winpos'
+  -- The restart command below restores explicitly after the new UI attaches.
+  local restarting = vim.v.startreason == 'restart!'
   require('auto-session').setup({
+    auto_restore = not restarting,
     suppressed_dirs = { '~/', '/' },
     save_extra_data = save_neo_tree_state,
     restore_extra_data = restore_neo_tree_state,
     pre_save_cmds = { preserve_file_window },
     post_restore_cmds = { open_neo_tree },
-    no_restore_cmds = { open_neo_tree },
+    no_restore_cmds = restarting and {} or { open_neo_tree },
     session_lens = {
       picker = 'telescope',
     },
   })
+
+  vim.keymap.set('n', '<leader>R', function()
+    local auto_session = require('auto-session')
+    local session_lib = require('auto-session.lib')
+    local current_tab = vim.api.nvim_get_current_tabpage()
+    for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+      vim.api.nvim_set_current_tabpage(tab)
+      preserve_file_window()
+      require('neo-tree.sources.manager').close_all()
+    end
+    vim.api.nvim_set_current_tabpage(current_tab)
+    session_lib.close_unsupported_windows()
+    if not auto_session.save_session(nil, { show_message = false }) then
+      return
+    end
+    local session_name = session_lib.escaped_session_path_to_session_name(vim.v.this_session)
+    -- Use only AutoSession's restore hooks, not a second native restart session.
+    vim.cmd.restart({
+      string.format("lua require('auto-session').restore_session(%q); "
+        .. "vim.schedule(function() require('auto-session.config').auto_restore = true end)", session_name),
+      bang = true,
+    })
+  end, { desc = 'Restart Neovim and restore session' })
 
   vim.keymap.set('n', '<leader>wr', '<cmd>AutoSession search<CR>', { desc = 'Search sessions' })
   vim.keymap.set('n', '<leader>ws', '<cmd>AutoSession save<CR>', { desc = 'Save session' })
@@ -675,9 +717,26 @@ lua <<EOF
  })
   require('cmp_git').setup()
 
+  local cmdline_mappings = cmp.mapping.preset.cmdline({
+    ['<Down>'] = cmp.mapping(function(fallback)
+      if cmp.visible() then
+        cmp.select_next_item()
+      else
+        fallback()
+      end
+    end, { 'c' }),
+    ['<Up>'] = cmp.mapping(function(fallback)
+      if cmp.visible() then
+        cmp.select_prev_item()
+      else
+        fallback()
+      end
+    end, { 'c' }),
+  })
+
   -- Use buffer source for `/` and `?` (if you enabled `native_menu`, this won't work anymore).
   cmp.setup.cmdline({ '/', '?' }, {
-    mapping = cmp.mapping.preset.cmdline(),
+    mapping = cmdline_mappings,
     sources = {
       { name = 'buffer' }
     }
@@ -685,7 +744,7 @@ lua <<EOF
 
   -- Use cmdline & path source for ':' (if you enabled `native_menu`, this won't work anymore).
   cmp.setup.cmdline(':', {
-    mapping = cmp.mapping.preset.cmdline(),
+    mapping = cmdline_mappings,
     sources = cmp.config.sources({
       { name = 'path' }
     }, {
