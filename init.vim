@@ -156,9 +156,10 @@ lua <<EOF
       return root
     end
 
-    -- Look for a project marker so imports from parent dirs stay inside root
+    -- A Git repository can contain multiple Typst projects, so only an explicit
+    -- Typst manifest should override the main file's directory.
     local main_dir = vim.fs.dirname(vim.fn.fnamemodify(path_of_main_file, ':p'))
-    local found = vim.fs.find({ 'typst.toml', '.git' }, { path = main_dir, upward = true })
+    local found = vim.fs.find('typst.toml', { path = main_dir, upward = true })
     if #found > 0 then
       return vim.fs.dirname(found[1])
     end
