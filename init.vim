@@ -172,10 +172,13 @@ lua <<EOF
       return root
     end
 
-    -- A Git repository can contain multiple Typst projects, so only an explicit
-    -- Typst manifest should override the main file's directory.
+    -- A repository can contain several projects. Recognize the thesis layout
+    -- without mistaking lib/thesis.typ for the master document.
     local main_dir = vim.fs.dirname(vim.fn.fnamemodify(path_of_main_file, ':p'))
-    local found = vim.fs.find('typst.toml', { path = main_dir, upward = true })
+    local found = vim.fs.find(function(name, dir)
+      return name == 'typst.toml'
+        or (name == 'thesis.typ' and vim.fn.isdirectory(vim.fs.joinpath(dir, 'chapters')) == 1)
+    end, { path = main_dir, upward = true, type = 'file' })
     if #found > 0 then
       return vim.fs.dirname(found[1])
     end
@@ -426,6 +429,8 @@ lua <<EOF
     local auto_session = require('auto-session')
     local session_lib = require('auto-session.lib')
     local current_tab = vim.api.nvim_get_current_tabpage()
+    local current_window = vim.api.nvim_get_current_win()
+    local current_view = vim.fn.winsaveview()
     for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
       vim.api.nvim_set_current_tabpage(tab)
       preserve_file_window()
@@ -433,6 +438,11 @@ lua <<EOF
     end
     vim.api.nvim_set_current_tabpage(current_tab)
     session_lib.close_unsupported_windows()
+    -- Closing sidebar windows can change which file window is active.
+    if vim.api.nvim_win_is_valid(current_window) then
+      vim.api.nvim_set_current_win(current_window)
+      vim.fn.winrestview(current_view)
+    end
     if not auto_session.save_session(nil, { show_message = false }) then
       return
     end
@@ -590,7 +600,7 @@ lua <<EOF
     end,
   })
 
-  vim.keymap.set('n', '<C-LeftMouse>', function()
+  local function go_to_definition_under_mouse()
     local mouse = vim.fn.getmousepos()
     if mouse.winid == 0 or mouse.line == 0 or not vim.api.nvim_win_is_valid(mouse.winid) then
       return
@@ -599,9 +609,17 @@ lua <<EOF
     vim.api.nvim_set_current_win(mouse.winid)
     vim.api.nvim_win_set_cursor(mouse.winid, { mouse.line, math.max(mouse.column - 1, 0) })
     vim.lsp.buf.definition()
-  end, { desc = 'Go to definition under mouse' })
+  end
+
+  -- Hammerspoon translates Command-click in Ghostty to Alt-click.
+  for _, modifier in ipairs({ 'D', 'M' }) do
+    vim.keymap.set('n', '<' .. modifier .. '-LeftMouse>', go_to_definition_under_mouse,
+      { desc = 'Go to definition under mouse' })
+    vim.keymap.set('n', '<' .. modifier .. '-LeftRelease>', '<Nop>')
+  end
 
   vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { desc = 'Go to definition' })
+  vim.keymap.set('n', '<D-o>', '<C-o>', { desc = 'Jump back' })
   vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { desc = 'Rename symbol' })
 
   local unused_function_namespace = vim.api.nvim_create_namespace('UnusedFunctions')
@@ -755,6 +773,41 @@ lua <<EOF
 
   -- Set up Go tooling and gopls with completion support.
   local capabilities = require('cmp_nvim_lsp').default_capabilities()
+
+  local tinymist_bin = vim.fn.exepath('tinymist')
+  if tinymist_bin == '' then
+    tinymist_bin = vim.fs.joinpath(vim.fn.stdpath('data'), 'typst-preview',
+      require('typst-preview.fetch').get_tinymist_bin_name())
+  end
+  vim.lsp.config('tinymist', {
+    cmd = { tinymist_bin },
+    capabilities = capabilities,
+    root_dir = function(bufnr, on_dir)
+      local path = vim.api.nvim_buf_get_name(bufnr)
+      on_dir(require('typst-preview.config').opts.get_root(path))
+    end,
+    before_init = function(_, config)
+      config.settings.tinymist.rootPath = config.root_dir
+    end,
+    on_init = function(client)
+      local root = client.config.root_dir
+      local main = vim.fs.joinpath(root, 'thesis.typ')
+      if vim.fn.filereadable(main) == 1 and vim.fn.isdirectory(vim.fs.joinpath(root, 'chapters')) == 1 then
+        client:exec_cmd({
+          title = 'Use thesis.typ as the master document',
+          command = 'tinymist.pinMain',
+          arguments = { main },
+        })
+      end
+    end,
+    settings = {
+      tinymist = {
+        exportPdf = 'never',
+      },
+    },
+  })
+  vim.lsp.enable('tinymist')
+
   require('go').setup({
     lsp_cfg = false,
     lsp_gofumpt = true,
