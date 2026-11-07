@@ -229,7 +229,7 @@ lua <<EOF
     pickers = {
       find_files = {
         hidden = true,
-        no_ignore = true,
+        no_ignore = false,
         mappings = {
           i = {
             ['<C-t>'] = open_telescope_selections_in_tabs,
@@ -486,6 +486,53 @@ lua <<EOF
 
   vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { desc = 'Go to definition' })
   vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { desc = 'Rename symbol' })
+
+  local unused_function_namespace = vim.api.nvim_create_namespace('UnusedFunctions')
+  local unused_function_group = vim.api.nvim_create_augroup('UnusedFunctions', { clear = true })
+  local unused_function_codes = {
+    ['reportUnusedFunction'] = true,
+    ['unused-function'] = true,
+    ['unusedfunc'] = true,
+  }
+
+  local function set_unused_function_highlight()
+    vim.api.nvim_set_hl(0, 'UnusedFunction', { fg = '#727169' })
+  end
+
+  set_unused_function_highlight()
+  vim.api.nvim_create_autocmd('ColorScheme', {
+    group = unused_function_group,
+    callback = set_unused_function_highlight,
+    desc = 'Keep unused functions gray after changing colorschemes',
+  })
+
+  vim.api.nvim_create_autocmd('DiagnosticChanged', {
+    group = unused_function_group,
+    callback = function(event)
+      local bufnr = event.buf
+      vim.api.nvim_buf_clear_namespace(bufnr, unused_function_namespace, 0, -1)
+
+      for _, diagnostic in ipairs(vim.diagnostic.get(bufnr)) do
+        local lsp_diagnostic = diagnostic.user_data and diagnostic.user_data.lsp or {}
+        local code = tostring(diagnostic.code or lsp_diagnostic.code or '')
+        local source = tostring(diagnostic.source or lsp_diagnostic.source or '')
+        local message = diagnostic.message:lower()
+        local is_unused_function = unused_function_codes[code]
+          or unused_function_codes[source]
+          or (code == 'U1000' and message:match('^func.- is unused'))
+
+        if is_unused_function then
+          vim.api.nvim_buf_set_extmark(bufnr, unused_function_namespace, diagnostic.lnum, diagnostic.col, {
+            end_row = diagnostic.end_lnum,
+            end_col = diagnostic.end_col,
+            hl_group = 'UnusedFunction',
+            priority = 150,
+          })
+        end
+      end
+    end,
+    desc = 'Gray out function names reported as unused',
+  })
 
   -- Set up nvim-cmp.
   local cmp = require'cmp'
