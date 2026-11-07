@@ -53,6 +53,8 @@ syntax enable
 set number
 " set relativenumber
 set mouse=a
+" Also makes native command-name completion case-insensitive for nvim-cmp.
+set ignorecase
 set termguicolors
 set hidden
 set timeoutlen=2000
@@ -81,6 +83,17 @@ let g:vimtex_main_choose_first = 1
 
 lua <<EOF
   vim.opt.autoread = true
+
+  local spell_group = vim.api.nvim_create_augroup('EnglishSpellcheck', { clear = true })
+  vim.api.nvim_create_autocmd('FileType', {
+    group = spell_group,
+    pattern = { 'typst', 'tex', 'plaintex' },
+    callback = function()
+      vim.opt_local.spell = false
+      vim.opt_local.spelllang = 'en_us'
+    end,
+    desc = 'Enable English spell checking for Typst and TeX',
+  })
 
   local auto_reload_group = vim.api.nvim_create_augroup('AutoReloadFromDisk', { clear = true })
   vim.api.nvim_create_autocmd({ 'FocusGained', 'BufEnter', 'CursorHold', 'CursorHoldI' }, {
